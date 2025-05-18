@@ -17,7 +17,7 @@ A NestJS REST service for collecting and storing Binance Smart Chain transaction
 
 - Node.js ≥ 18  
 - npm ≥ 8 or Yarn ≥ 1.22  
-- PostgreSQL ≥ 13 (local installation or Docker)  
+- PostgreSQL ≥ 13 
 
 ---
 
