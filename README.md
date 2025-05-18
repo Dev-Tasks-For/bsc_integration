@@ -24,9 +24,6 @@ A NestJS REST service for collecting and storing Binance Smart Chain transaction
 ## 🚀 Installation
 
 1. **Clone the repository**  
-   ```bash
-   git clone <repo-url>
-   cd test-task
 2. **Install dependencies**
 
 3. **Create a `.env` file at the project root:**  
