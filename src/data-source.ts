@@ -3,9 +3,6 @@ import { Transaction } from './transactions/transaction.entity';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-console.log('DB_PASS is:', JSON.stringify(process.env.DB_PASS));
-
-
 export const AppDataSource = new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST,
