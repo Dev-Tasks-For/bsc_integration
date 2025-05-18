@@ -47,10 +47,10 @@ A NestJS REST service for collecting and storing Binance Smart Chain transaction
   ```bash
    npm run migration:revert
 ## Running the Application
-- Generate a new migration 
+- Development mode (watch + hot reload): 
   ```bash
    npm run start:dev
-- Run pending migrations
+- Production build and start:
   ```bash
    npm run build
    npm run start:prod
@@ -61,7 +61,7 @@ A NestJS REST service for collecting and storing Binance Smart Chain transaction
 | GET | `/web3/balance/usdt/:address` | Fetch USDT balance of a wallet |
 | POST | `/web3/tx/:txHash` | Fetch transaction details by hash and save |
 
-## API Endpoints
+## Examples
   ```bash
    # Fetch BNB balance
 curl http://localhost:3000/web3/balance/bnb/YourWalletAddress
