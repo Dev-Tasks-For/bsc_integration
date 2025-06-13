@@ -34,7 +34,6 @@ A NestJS REST service for collecting and storing Binance Smart Chain transaction
    DB_PASS=YOUR_PASSWORD
    DB_NAME=YOUR_BD
 
-   NETWORK=<eth or bsc>
    ETH_RPC_URL=https://ethereum-rpc.publicnode.com
    ETHERSCAN_API_KEY=<YOUR_API_KEY>
    BSC_RPC_URL=https://bsc-dataseed.binance.org/
