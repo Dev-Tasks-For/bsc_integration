@@ -1,7 +1,9 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post,Query } from '@nestjs/common';
 import { Web3Service } from './web3.service';
 import { Transaction } from 'src/transactions/transaction.entity';
 import { Throttle } from '@nestjs/throttler';
+
+type NetName = 'eth' | 'bsc';
 
 @Controller('web3')
 export class Web3Controller {
@@ -13,18 +15,24 @@ export class Web3Controller {
     return this.web3Service.fetchTransaction(txHash);
   }
 
-  @Get('balance/bnb/:address')
+  @Get('native/:address')
   @Throttle({ default: { limit: 10, ttl: 60 } })
-  async getBNBBalance(@Param('address') address: string): Promise<{ balance: string }> {
-    const balance = await this.web3Service.getNativeBalance(address);
-    return { balance };
+  async nativeBalance(
+    @Param('address') address: string,
+    @Query('net') net: NetName = 'bsc',
+  ) {
+    const balance = await this.web3Service.getNativeBalance(address, net);
+    return { network: net, native: balance };
   }
 
-  @Get('balance/usdt/:address')
+  @Get('usdt/:address')
   @Throttle({ default: { limit: 10, ttl: 60 } })
-  async getUSDTBalance(@Param('address') address: string): Promise<{ balance: string }> {
-    const balance = await this.web3Service.getUSDTBalance(address);
-    return { balance };
+  async usdtBalance(
+    @Param('address') address: string,
+    @Query('net') net: NetName = 'bsc',
+  ) {
+    const balance = await this.web3Service.getUSDTBalance(address, net);
+    return { network: net, usdt: balance };
   }
 }
 
