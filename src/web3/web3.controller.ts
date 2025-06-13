@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post,Query } from '@nestjs/common';
 import { Web3Service } from './web3.service';
-import { Transaction } from 'src/transactions/transaction.entity';
+import { Transaction } from 'src/common/entities/transaction.entity';
 import { Throttle } from '@nestjs/throttler';
 
 type NetName = 'eth' | 'bsc';

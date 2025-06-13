@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Web3Module } from './web3/web3.module';
-import { Transaction } from './transactions/transaction.entity';
+import { Transaction } from './common/entities/transaction.entity';
 
 @Module({
   imports: [

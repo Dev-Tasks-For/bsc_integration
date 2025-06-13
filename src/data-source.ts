@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { Transaction } from './transactions/transaction.entity';
+import { Transaction } from './common/entities/transaction.entity';
 import * as dotenv from 'dotenv';
 dotenv.config();
 

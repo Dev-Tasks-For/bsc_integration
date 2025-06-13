@@ -1,14 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import {
-  StaticJsonRpcProvider,
-  JsonRpcProvider,
-} from '@ethersproject/providers';
+import {StaticJsonRpcProvider, JsonRpcProvider} from '@ethersproject/providers';
 import { Contract, utils } from 'ethers';
 import axios from 'axios';
 
-import { Transaction } from 'src/transactions/transaction.entity';
+import { Transaction } from 'src/common/entities/transaction.entity';
 
 type NetName = 'eth' | 'bsc';
 
