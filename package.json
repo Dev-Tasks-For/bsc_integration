@@ -20,8 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "typeorm": "ts-node -r tsconfig-paths/register -r dotenv/config ./node_modules/typeorm/cli.js",
     "migration:generate": "npm run typeorm -- migration:generate -d src/data-source.ts src/migrations/CreateTransactions",
-    "migration:run":      "npm run typeorm -- migration:run -d src/data-source.ts",
-    "migration:revert":   "npm run typeorm -- migration:revert -d src/data-source.ts"
+    "migration:run": "npm run typeorm -- migration:run -d src/data-source.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/data-source.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -29,6 +29,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/throttler": "^6.4.0",
     "@nestjs/typeorm": "^11.0.0",
+    "axios": "^1.9.0",
     "ethers": "^5.8.0",
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
