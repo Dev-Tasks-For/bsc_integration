@@ -7,28 +7,65 @@ import axios from 'axios';
 
 import { Transaction } from 'src/transactions/transaction.entity';
 
+type Network = 'eth' | 'bsc';
+
+interface NetConfig {
+  rpcUrl: string;
+  nativeSymbol: string;
+  usdtAddress: string;
+  scanBase: string;
+  scanKey: string;
+}
+
+const NETWORKS: Record<Network, NetConfig> = {
+  eth: {
+    rpcUrl:       process.env.ETH_RPC_URL  ?? 'https://ethereum.publicnode.com',
+    nativeSymbol: 'ETH',
+    usdtAddress:  '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    scanBase:     'https://api.etherscan.io',
+    scanKey:      process.env.ETHERSCAN_API_KEY ?? '',
+  },
+  bsc: {
+    rpcUrl:       process.env.BSC_RPC_URL  ?? 'https://bsc-dataseed.binance.org/',
+    nativeSymbol: 'BNB',
+    usdtAddress:  '0x55d398326f99059fF775485246999027B3197955',
+    scanBase:     'https://api.bscscan.com',
+    scanKey:      process.env.BSCSCAN_API_KEY  ?? '',
+  },
+};
+
 const ERC20_TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 const DEPOSITED_TOPIC      = utils.id('Deposited(address,uint256)');
 const USER_OP_EVENT_TOPIC  = utils.id('UserOperationEvent(bytes32,address,address,address,uint256,uint256)');
 const DEPOSIT_FOR_SIG      = utils.id('depositFor(address)').slice(0, 10);
 const DEPOSIT_SIG          = utils.id('deposit(address,address,uint256)').slice(0, 10);
 
-const ENTRYPOINT_FALLBACK = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789'; // v0.6
-const PAYMASTER_ENV       = (process.env.PAYMASTER_ADDRESS ?? '').toLowerCase();
-const BSCSCAN_API_KEY     = process.env.BSCSCAN_API_KEY ?? '';
+const ENTRYPOINT_FALLBACK = '0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789'; 
 
 interface ParsedTransfer { from: string; to: string; value: string; tokenAddress: string; }
-
 @Injectable()
 export class Web3Service implements OnModuleInit {
-  private provider = new JsonRpcProvider(process.env.BSC_RPC_URL ?? 'https://bsc-dataseed.binance.org/');
+  private readonly provider: JsonRpcProvider;
+  private readonly nativeSymbol: string;
+  private readonly USDT_ADDRESS: string;
+  private readonly scanBase: string;
+  private readonly scanKey: string;
+
   private entryPointAddress = ENTRYPOINT_FALLBACK.toLowerCase();
-  private readonly USDT_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
 
   constructor(
     @InjectRepository(Transaction)
     private readonly txRepo: Repository<Transaction>,
-  ) {}
+  ) {
+    const net: Network = (process.env.NETWORK as Network) ?? 'bsc';
+    const cfg          = NETWORKS[net];
+
+    this.provider      = new JsonRpcProvider(cfg.rpcUrl);
+    this.nativeSymbol  = cfg.nativeSymbol;
+    this.USDT_ADDRESS  = cfg.usdtAddress;
+    this.scanBase      = cfg.scanBase;
+    this.scanKey       = cfg.scanKey;
+  }
 
   async onModuleInit(): Promise<void> {
     try {
@@ -36,12 +73,13 @@ export class Web3Service implements OnModuleInit {
       if (list.length) this.entryPointAddress = list[0].toLowerCase();
     } catch {}
   }
+
   async fetchTransaction(txHash: string): Promise<Transaction> {
     const tx      = await this.provider.getTransaction(txHash);
-    if (!tx) throw new NotFoundException('Transaction not found on BSC');
+    if (!tx) throw new NotFoundException('Transaction not found');
     const receipt = await this.provider.getTransactionReceipt(txHash);
 
-    if (tx.value.gt(0)) return this.handleBnbTransfer(tx);
+    if (tx.value.gt(0)) return this.handleNativeTransfer(tx);
 
     if (tx.to?.toLowerCase() === this.entryPointAddress) {
       const aa = await this.handleEntryPointTransaction(tx, receipt);
@@ -49,7 +87,7 @@ export class Web3Service implements OnModuleInit {
     }
 
     const detectedPM = this.extractPaymasterFromReceipt(receipt);
-    const paymaster  = PAYMASTER_ENV || detectedPM;
+    const paymaster  = (process.env.PAYMASTER_ADDRESS ?? '').toLowerCase() || detectedPM;
     if (paymaster && tx.to?.toLowerCase() === paymaster) {
       const pm = await this.handlePaymasterTransaction(tx, receipt);
       if (pm) return pm;
@@ -58,16 +96,17 @@ export class Web3Service implements OnModuleInit {
     const erc = await this.handleErc20Transfer(tx, receipt);
     if (erc) return erc;
 
-    const scan = await this.handleBscScanTransaction(txHash);
+    const scan = await this.handleScanTransaction(txHash);
     if (scan) return scan;
 
     throw new NotFoundException('No supported transfer found in this transaction');
   }
-
-  private async handleBnbTransfer(tx: any): Promise<Transaction> {
+  private async handleNativeTransfer(tx: any): Promise<Transaction> {
     return this.createEntity({
       txHash: tx.hash, from: tx.from, to: tx.to,
-      amount: utils.formatEther(tx.value), currency: 'BNB', date: new Date(),
+      amount: utils.formatEther(tx.value),
+      currency: this.nativeSymbol,
+      date: new Date(),
     });
   }
 
@@ -79,7 +118,9 @@ export class Web3Service implements OnModuleInit {
     if (dep) {
       return this.createEntity({
         txHash: tx.hash, from: tx.from, to: '0x' + dep.topics[1].slice(26),
-        amount: utils.formatEther(dep.data), currency: 'BNB', date: new Date(),
+        amount: utils.formatEther(dep.data),
+        currency: this.nativeSymbol,
+        date: new Date(),
       });
     }
     return null;
@@ -100,7 +141,9 @@ export class Web3Service implements OnModuleInit {
         if (dec.name === 'depositFor') {
           return this.createEntity({
             txHash: tx.hash, from: tx.from, to: dec.args.account,
-            amount: utils.formatEther(tx.value), currency: 'BNB', date: new Date(),
+            amount: utils.formatEther(tx.value),
+            currency: this.nativeSymbol,
+            date: new Date(),
           });
         }
         if (dec.name === 'deposit') {
@@ -108,7 +151,9 @@ export class Web3Service implements OnModuleInit {
           return this.createEntity({
             txHash: tx.hash, from: tx.from, to: dec.args.account,
             amount: utils.formatUnits(dec.args.amount, token.decimals),
-            currency: token.symbol, tokenAddress: dec.args.token, date: new Date(),
+            currency: token.symbol,
+            tokenAddress: dec.args.token,
+            date: new Date(),
           });
         }
       } catch {}
@@ -122,42 +167,51 @@ export class Web3Service implements OnModuleInit {
     return this.saveTransfer(tx.hash, transfers[0]);
   }
 
-  private async handleBscScanTransaction(txHash: string): Promise<Transaction | null> {
+  private async handleScanTransaction(txHash: string): Promise<Transaction | null> {
     try {
-      const { data: i } = await axios.get(
-        `https://api.bscscan.com/api?module=account&action=txlistinternal&txhash=${txHash}&apikey=${BSCSCAN_API_KEY}`,
-      );
+      const urlInternal = `${this.scanBase}/api?module=account&action=txlistinternal` +
+                          `&txhash=${txHash}&apikey=${this.scanKey}`;
+      const { data: i } = await axios.get(urlInternal);
       if (i.status === '1' && i.result.length) {
         const itx = i.result[0];
         return this.createEntity({
-          txHash, from: itx.from, to: itx.to,
-          amount: utils.formatEther(itx.value), currency: 'BNB',
+          txHash,
+          from: itx.from,
+          to:   itx.to,
+          amount: utils.formatEther(itx.value),
+          currency: this.nativeSymbol,
           date: new Date(+itx.timeStamp * 1000),
         });
       }
 
-      const { data: t } = await axios.get(
-        `https://api.bscscan.com/api?module=account&action=tokentx&txhash=${txHash}&apikey=${BSCSCAN_API_KEY}`,
-      );
+      const urlToken = `${this.scanBase}/api?module=account&action=tokentx` +
+                       `&txhash=${txHash}&apikey=${this.scanKey}`;
+      const { data: t } = await axios.get(urlToken);
       if (t.status === '1' && t.result.length) {
         const d = t.result[0];
         return this.createEntity({
-          txHash, from: d.from, to: d.to,
+          txHash,
+          from: d.from,
+          to:   d.to,
           amount: utils.formatUnits(d.value, parseInt(d.tokenDecimal) || 18),
-          currency: d.tokenSymbol, tokenAddress: d.contractAddress,
+          currency: d.tokenSymbol,
+          tokenAddress: d.contractAddress,
           date: new Date(+d.timeStamp * 1000),
         });
       }
-    } catch (e) { console.error('BscScan error', e); }
+    } catch (e) {
+      console.error('Scan API error', e);
+    }
     return null;
   }
+
   private extractTransfers(logs: any[]): ParsedTransfer[] {
     return logs
       .filter(l => l.topics[0] === ERC20_TRANSFER_TOPIC && l.topics.length === 3)
       .map(l => ({
-        from: '0x' + l.topics[1].slice(26),
-        to:   '0x' + l.topics[2].slice(26),
-        value: l.data,
+        from:        '0x' + l.topics[1].slice(26),
+        to:          '0x' + l.topics[2].slice(26),
+        value:       l.data,
         tokenAddress: l.address,
       }));
   }
@@ -170,9 +224,13 @@ export class Web3Service implements OnModuleInit {
   private async saveTransfer(txHash: string, t: ParsedTransfer): Promise<Transaction> {
     const token = await this.getTokenInfo(t.tokenAddress);
     return this.createEntity({
-      txHash, from: t.from, to: t.to,
+      txHash,
+      from: t.from,
+      to:   t.to,
       amount: utils.formatUnits(t.value, token.decimals),
-      currency: token.symbol, tokenAddress: t.tokenAddress, date: new Date(),
+      currency: token.symbol,
+      tokenAddress: t.tokenAddress,
+      date: new Date(),
     });
   }
 
@@ -181,12 +239,12 @@ export class Web3Service implements OnModuleInit {
     currency: string; date: Date; tokenAddress?: string;
   }): Promise<Transaction> {
     const ent = this.txRepo.create({
-      txHash: data.txHash,
+      txHash:           data.txHash,
       fromWalletAddress: data.from,
       toWalletAddress:   data.to,
-      amount: data.amount,
+      amount:   data.amount,
       currency: data.currency,
-      date: data.date,
+      date:     data.date,
     });
     return this.txRepo.save(ent);
   }
@@ -202,10 +260,12 @@ export class Web3Service implements OnModuleInit {
         erc.decimals().catch(() => 18),
       ]);
       return { symbol, decimals: dec };
-    } catch { return { symbol: 'UNKNOWN', decimals: 18 }; }
+    } catch {
+      return { symbol: 'UNKNOWN', decimals: 18 };
+    }
   }
 
-  async getBNBBalance(wallet: string): Promise<string> {
+  async getNativeBalance(wallet: string): Promise<string> {
     return utils.formatEther(await this.provider.getBalance(wallet));
   }
   async getUSDTBalance(wallet: string): Promise<string> {

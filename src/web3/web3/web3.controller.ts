@@ -16,7 +16,7 @@ export class Web3Controller {
   @Get('balance/bnb/:address')
   @Throttle({ default: { limit: 10, ttl: 60 } })
   async getBNBBalance(@Param('address') address: string): Promise<{ balance: string }> {
-    const balance = await this.web3Service.getBNBBalance(address);
+    const balance = await this.web3Service.getNativeBalance(address);
     return { balance };
   }
 
